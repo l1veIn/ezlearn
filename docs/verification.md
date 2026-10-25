@@ -14,6 +14,8 @@
 | `pnpm build:vercel` | Vercel Build Output 生成通过，未发布 |
 | English Demo 包校验 | 正式校验器通过；4 个知识点、16 道原创题、4 个可组卷蓝图 |
 | 演示入口重复调用 | `prepare-demo.mjs` 连续执行返回相同目标与课程 |
+| 全新源码目录启动 | 按 README 安装 frozen lockfile、构建、备课与启动；独立 3213 端口确认页面、1 个目标与 1 节课程 |
+| GitHub Actions | [main 首次代码提交的 validate 工作流通过](https://github.com/l1veIn/ezlearn/actions/runs/40210333392) |
 
 核心测试覆盖了草稿与提交交接、平台客观阅卷、主观分数范围、必填反馈、版本冲突、无效状态、并发与幂等、重做、评价修订与证据重建、未知能力、薄弱点选题、包版本不可变、蓝图数量/分值/覆盖、重启持久化、迁移、错误导入原子拒绝，以及重复 topic 不能制造额外证据。具体断言见 `tests/core.test.ts`。
 
