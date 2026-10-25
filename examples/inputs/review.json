@@ -1,0 +1,12 @@
+{
+  "attempt_id": "REPLACE_WITH_ATTEMPT_ID",
+  "idempotency_key": "review:REPLACE_WITH_ATTEMPT_ID:1",
+  "expected_version": 0,
+  "grades": [
+    {"question_id":"condition-01","score":2,"feedback":"替换为老师针对实际作答的反馈。客观得分由平台按答案键计算。"},
+    {"question_id":"condition-02","score":2,"feedback":"替换为老师针对实际作答的反馈。"},
+    {"question_id":"condition-04","score":3,"feedback":"这里的3分只是输入格式示例。老师必须读取用户实际答案，按四项rubric重新给分与解释。"}
+  ],
+  "summary": "替换为基于本轮证据的简短总结。",
+  "next_steps": "替换为一个具体的下次练习建议。"
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.tmp/
+.wrangler/
+.vercel/
+deploy/cloudflare/worker-configuration.d.ts
+pnpm-lock.yaml
+ezlearn-bootstrap-prompt.md

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.ezlearn/
+.ezlearn*/
+learning-backup*.json
+backups/
+.wrangler/
+.vercel/
+.env
+.dev.vars
+*.sqlite*
+*.db*
+test-results/
+playwright-report/
+coverage/
+*.log
+.tmp/

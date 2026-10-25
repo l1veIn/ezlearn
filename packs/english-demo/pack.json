@@ -1,0 +1,750 @@
+{
+  "manifest": {
+    "schema_version": 1,
+    "id": "english-demo",
+    "version": "1.0.0",
+    "name": "English Demo · 工作里的小句子",
+    "language": "zh-CN",
+    "description": "用接口重试、因果分析、缓存与发布说明练习四组英文表达。原创功能演示材料，不是官方考纲、真题库或完整备考课程。",
+    "goals": [
+      "用简单英文解释开发工作中的条件、因果与操作步骤",
+      "演示每日15分钟学习闭环；实际考试目标应另行安装相应合规学习包"
+    ],
+    "license": "原创功能演示内容；正式对外再许可条款待项目作者确认。",
+    "source": "ezlearn v0.1 开发过程中自编；未引用官方考试题或第三方教材。",
+    "teaching": {
+      "minutes": 15,
+      "advice": "每轮围绕一个小知识点，先用工作情境讲解，再做2道单选和1道简答；没有摸底证据时标为未知。只用用户授权且实际可见的简短上下文。"
+    }
+  },
+  "topics": [
+    {
+      "id": "condition",
+      "title": "用 if 表达条件与结果",
+      "prerequisites": []
+    },
+    {
+      "id": "cause",
+      "title": "用 because 与 therefore 解释因果",
+      "prerequisites": [
+        "condition"
+      ]
+    },
+    {
+      "id": "contrast",
+      "title": "用 although 与 however 表达转折",
+      "prerequisites": [
+        "cause"
+      ]
+    },
+    {
+      "id": "instructions",
+      "title": "把要求、建议和顺序写清楚",
+      "prerequisites": [
+        "condition"
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "id": "developer-english",
+      "title": "工作里的小句子",
+      "path": "materials/developer-english.md",
+      "content": "# 工作里的小句子\n\n这是一份原创功能演示讲义。它用开发场景练习英语表达，不代表任何官方考试考纲。\n\n## 条件与结果\n\n描述未来有可能发生的情况，可以用 If + 一般现在时，主句用 will + 动词原形。例如：If the request fails, we will retry it. 请求失败是条件，重试是结果。不要因为说的是未来，就把 if 从句写成 If the request will fail。主句在前时通常不用逗号：We will retry the request if it fails。\n\nWhen 常用于预期会发生的时间节点；if 强调是否发生尚不确定。If the build fails, we will inspect the logs. 表示构建可能成功，也可能失败；When the build finishes, we will inspect the report. 则把完成当作预期事件。\n\n## 原因与结果\n\nBecause 后接一个完整的原因从句：We retried the request because the connection timed out. 也可以先交代原因：Because the connection timed out, we retried the request. Therefore 用来引出结果，适合另起一句：The connection timed out. Therefore, we retried the request.\n\n在这套练习中，不把 because 和 so 同时用来连接同一组因果分句。原因可以帮助解释一个决定，但不能把时间先后直接当作因果证据。The latency fell after deployment. 只说明先后；The latency fell because we removed a repeated query. 才明确提出因果解释。\n\n## 让步与转折\n\nAlthough 后接完整从句，表示让步：Although the cache is fast, it can return stale data. 两部分表达“尽管……，仍然……”。在这套练习中，不再用 but 重复连接同一个 although 从句。However 是转折副词，可以另起一句：The cache is fast. However, it can return stale data.\n\nYet 和 still 常帮助保留“与预期相反”的重点。例如：The test passed, yet the bug remained. 表达测试通过仍未消除问题。选词前先判断两部分是在补充、解释原因，还是形成反差。\n\n## 说明与建议\n\nMust 表示本段规则中的必要要求；should 表示建议：You must set the database URL before starting the app. You should keep a backup before upgrading. 祈使句直接使用动词原形：Save the file. Then restart the server. 否定祈使句用 Do not：Do not commit secrets.\n\n写操作说明时，先给条件和顺序，再说期望结果：First, save the configuration. Then restart the server. If the health check fails, inspect the logs. 省略顺序或把建议写成强制要求，会使读者误解。语言练习里的 must/should 表达强度，应服从题目给出的场景规则。\n",
+      "source": "ezlearn 原创功能演示讲义，english-demo@1.0.0"
+    }
+  ],
+  "questions": [
+    {
+      "id": "condition-01",
+      "type": "single_choice",
+      "prompt": "补全：If the request ___, we will retry it.",
+      "options": [
+        {
+          "id": "A",
+          "text": "fails"
+        },
+        {
+          "id": "B",
+          "text": "will fail"
+        },
+        {
+          "id": "C",
+          "text": "failed"
+        },
+        {
+          "id": "D",
+          "text": "failing"
+        }
+      ],
+      "answer": "A",
+      "explanation": "表示未来可能发生的条件时，if 从句使用一般现在时，主句使用 will + 动词原形。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "condition"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "条件与结果"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "condition-02",
+      "type": "single_choice",
+      "prompt": "哪句最准确表达“如果构建失败，我们将检查日志”？",
+      "options": [
+        {
+          "id": "A",
+          "text": "If the build fails, we will inspect the logs."
+        },
+        {
+          "id": "B",
+          "text": "If the build will fail, we inspect the logs."
+        },
+        {
+          "id": "C",
+          "text": "Because the build fails, we will inspect the logs."
+        },
+        {
+          "id": "D",
+          "text": "When the logs fail, we will inspect the build."
+        }
+      ],
+      "answer": "A",
+      "explanation": "If 表示可能发生的条件；because 表示原因；主语与动作也需要对应。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "condition"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "条件与结果"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "condition-03",
+      "type": "single_choice",
+      "prompt": "哪句把“构建完成”当作预期会发生的时间节点？",
+      "options": [
+        {
+          "id": "A",
+          "text": "If the build finishes, we may read the report."
+        },
+        {
+          "id": "B",
+          "text": "When the build finishes, we will read the report."
+        },
+        {
+          "id": "C",
+          "text": "Because the build finishes, the report is false."
+        },
+        {
+          "id": "D",
+          "text": "Although the build finishes, it is a request."
+        }
+      ],
+      "answer": "B",
+      "explanation": "When 引出预期发生的时间节点；if 更强调是否发生尚不确定。",
+      "points": 2,
+      "difficulty": 2,
+      "topic_ids": [
+        "condition"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "条件与结果"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "condition-04",
+      "type": "short_answer",
+      "prompt": "你在写重试逻辑的英文说明。用一句英文表达：“如果连接超时，我们会重试请求。”",
+      "answer": "If the connection times out, we will retry the request.",
+      "explanation": "可接受 We will retry the request if the connection times out. 核心是条件从句的现在时和结果的 will + 动词。",
+      "points": 4,
+      "difficulty": 2,
+      "topic_ids": [
+        "condition"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "条件与结果"
+        }
+      ],
+      "rubric": [
+        {
+          "criterion": "准确表达连接超时作为条件",
+          "points": 1
+        },
+        {
+          "criterion": "if 从句使用合适的一般现在时",
+          "points": 1
+        },
+        {
+          "criterion": "主句使用 will + 动词原形表达结果",
+          "points": 1
+        },
+        {
+          "criterion": "完整表达重试请求，句意清楚",
+          "points": 1
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "cause-01",
+      "type": "single_choice",
+      "prompt": "补全：We rolled back ___ the error rate increased.",
+      "options": [
+        {
+          "id": "A",
+          "text": "because"
+        },
+        {
+          "id": "B",
+          "text": "although"
+        },
+        {
+          "id": "C",
+          "text": "however"
+        },
+        {
+          "id": "D",
+          "text": "if not"
+        }
+      ],
+      "answer": "A",
+      "explanation": "题目是在说明已经回滚的原因，because 后接完整原因从句。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "cause"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "原因与结果"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "cause-02",
+      "type": "single_choice",
+      "prompt": "哪句以清楚的句法表达结果？",
+      "options": [
+        {
+          "id": "A",
+          "text": "The server was overloaded. Therefore, we added a worker."
+        },
+        {
+          "id": "B",
+          "text": "Therefore the server because overloaded."
+        },
+        {
+          "id": "C",
+          "text": "The server was overloaded because therefore."
+        },
+        {
+          "id": "D",
+          "text": "Although the server was overloaded, because we added a worker."
+        }
+      ],
+      "answer": "A",
+      "explanation": "Therefore 可以在新句中引出结果，前一句给出背景或原因。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "cause"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "原因与结果"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "cause-03",
+      "type": "single_choice",
+      "prompt": "哪句只陈述时间先后，没有明确断言因果？",
+      "options": [
+        {
+          "id": "A",
+          "text": "The latency fell because we removed a repeated query."
+        },
+        {
+          "id": "B",
+          "text": "We removed a repeated query. Therefore, the latency fell."
+        },
+        {
+          "id": "C",
+          "text": "The latency fell after deployment."
+        },
+        {
+          "id": "D",
+          "text": "Because the old query was slow, we replaced it."
+        }
+      ],
+      "answer": "C",
+      "explanation": "After deployment 表达时间关系；because 和 therefore 则明确提出原因或结果。",
+      "points": 2,
+      "difficulty": 2,
+      "topic_ids": [
+        "cause"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "原因与结果"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "cause-04",
+      "type": "short_answer",
+      "prompt": "把两条信息合成一句含 because 的英文：The connection timed out. We retried the request.",
+      "answer": "We retried the request because the connection timed out.",
+      "explanation": "可把 because 从句放前面并加逗号。不要把重试写成超时的原因。",
+      "points": 4,
+      "difficulty": 2,
+      "topic_ids": [
+        "cause"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "原因与结果"
+        }
+      ],
+      "rubric": [
+        {
+          "criterion": "准确表达请求被重试",
+          "points": 1
+        },
+        {
+          "criterion": "准确表达连接超时",
+          "points": 1
+        },
+        {
+          "criterion": "because 后使用完整原因从句",
+          "points": 1
+        },
+        {
+          "criterion": "因果方向正确且句意清楚",
+          "points": 1
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "contrast-01",
+      "type": "single_choice",
+      "prompt": "补全：___ the cache is fast, it can return stale data.",
+      "options": [
+        {
+          "id": "A",
+          "text": "Although"
+        },
+        {
+          "id": "B",
+          "text": "Because"
+        },
+        {
+          "id": "C",
+          "text": "Therefore"
+        },
+        {
+          "id": "D",
+          "text": "Then"
+        }
+      ],
+      "answer": "A",
+      "explanation": "速度快通常是优点，但仍可能返回旧数据，两部分形成让步关系。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "contrast"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "让步与转折"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "contrast-02",
+      "type": "single_choice",
+      "prompt": "哪句符合讲义中的清楚转折写法？",
+      "options": [
+        {
+          "id": "A",
+          "text": "Although the test passed, but the bug remained."
+        },
+        {
+          "id": "B",
+          "text": "The test passed. However, the bug remained."
+        },
+        {
+          "id": "C",
+          "text": "Because the test passed, although."
+        },
+        {
+          "id": "D",
+          "text": "However the bug, the test."
+        }
+      ],
+      "answer": "B",
+      "explanation": "However 可以在新句中引出转折。在本练习中，不用 although 与 but 重复连接同一组分句。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "contrast"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "让步与转折"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "contrast-03",
+      "type": "single_choice",
+      "prompt": "“The patch is small, yet it changes the API.”中 yet 的作用是什么？",
+      "options": [
+        {
+          "id": "A",
+          "text": "补充发布时间"
+        },
+        {
+          "id": "B",
+          "text": "说明补丁小是 API 变化的原因"
+        },
+        {
+          "id": "C",
+          "text": "强调与预期相反的变化"
+        },
+        {
+          "id": "D",
+          "text": "表示变化尚未发生"
+        }
+      ],
+      "answer": "C",
+      "explanation": "这里 yet 用作连词，强调补丁虽小，却带来了 API 变化。",
+      "points": 2,
+      "difficulty": 2,
+      "topic_ids": [
+        "contrast"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "让步与转折"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "contrast-04",
+      "type": "short_answer",
+      "prompt": "用 although 写一句英文：测试通过了，但问题仍然存在。",
+      "answer": "Although the test passed, the bug remained.",
+      "explanation": "可接受 Although the tests passed, the issue remained. 保留“让步”与“仍有问题”的反差。",
+      "points": 4,
+      "difficulty": 2,
+      "topic_ids": [
+        "contrast"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "让步与转折"
+        }
+      ],
+      "rubric": [
+        {
+          "criterion": "although 后接完整从句",
+          "points": 1
+        },
+        {
+          "criterion": "准确表达测试通过",
+          "points": 1
+        },
+        {
+          "criterion": "准确表达问题仍在",
+          "points": 1
+        },
+        {
+          "criterion": "转折关系清楚，避免重复 although...but 结构",
+          "points": 1
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "instructions-01",
+      "type": "single_choice",
+      "prompt": "本场景中，数据库 URL 是启动应用的必要条件。哪句最准确？",
+      "options": [
+        {
+          "id": "A",
+          "text": "You should perhaps set the database URL."
+        },
+        {
+          "id": "B",
+          "text": "You must set the database URL before starting the app."
+        },
+        {
+          "id": "C",
+          "text": "You might set it after every response."
+        },
+        {
+          "id": "D",
+          "text": "You set must before database."
+        }
+      ],
+      "answer": "B",
+      "explanation": "本题规则明确它是必要条件，因此 must 比 should 更准确。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "instructions"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "说明与建议"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "instructions-02",
+      "type": "single_choice",
+      "prompt": "选择正确的否定祈使句。",
+      "options": [
+        {
+          "id": "A",
+          "text": "Not commit secrets."
+        },
+        {
+          "id": "B",
+          "text": "Do not commit secrets."
+        },
+        {
+          "id": "C",
+          "text": "Does not commit secrets."
+        },
+        {
+          "id": "D",
+          "text": "Must not you secrets."
+        }
+      ],
+      "answer": "B",
+      "explanation": "否定祈使句使用 Do not + 动词原形。",
+      "points": 2,
+      "difficulty": 1,
+      "topic_ids": [
+        "instructions"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "说明与建议"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "instructions-03",
+      "type": "single_choice",
+      "prompt": "哪组说明最清楚地给出了操作顺序？",
+      "options": [
+        {
+          "id": "A",
+          "text": "Restart and save maybe before it."
+        },
+        {
+          "id": "B",
+          "text": "First, save the configuration. Then restart the server."
+        },
+        {
+          "id": "C",
+          "text": "Because restart, therefore save."
+        },
+        {
+          "id": "D",
+          "text": "Save the restarted server configuration first then before."
+        }
+      ],
+      "answer": "B",
+      "explanation": "First 与 Then 使两个操作的顺序明确。",
+      "points": 2,
+      "difficulty": 2,
+      "topic_ids": [
+        "instructions"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "说明与建议"
+        }
+      ],
+      "source_type": "pack"
+    },
+    {
+      "id": "instructions-04",
+      "type": "short_answer",
+      "prompt": "写两句英文操作说明：先保存配置，然后重启服务。使用 First 和 Then。",
+      "answer": "First, save the configuration. Then restart the server.",
+      "explanation": "祈使句直接以动词原形开头。可接受 service 代替 server。",
+      "points": 4,
+      "difficulty": 2,
+      "topic_ids": [
+        "instructions"
+      ],
+      "material_refs": [
+        {
+          "material_id": "developer-english",
+          "heading": "说明与建议"
+        }
+      ],
+      "rubric": [
+        {
+          "criterion": "用 First 标出第一步",
+          "points": 1
+        },
+        {
+          "criterion": "第一步准确表达保存配置",
+          "points": 1
+        },
+        {
+          "criterion": "用 Then 标出第二步",
+          "points": 1
+        },
+        {
+          "criterion": "第二步准确表达重启服务且动词形式清楚",
+          "points": 1
+        }
+      ],
+      "source_type": "pack"
+    }
+  ],
+  "blueprints": [
+    {
+      "id": "diagnostic",
+      "name": "四组表达简短摸底",
+      "kind": "diagnostic",
+      "sections": [
+        {
+          "type": "single_choice",
+          "count": 4,
+          "points": 2,
+          "topic_ids": [
+            "condition",
+            "cause",
+            "contrast",
+            "instructions"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "daily-condition",
+      "name": "条件与重试 · 日常练习",
+      "kind": "daily",
+      "sections": [
+        {
+          "type": "single_choice",
+          "count": 2,
+          "points": 2,
+          "topic_ids": [
+            "condition"
+          ]
+        },
+        {
+          "type": "short_answer",
+          "count": 1,
+          "points": 4,
+          "topic_ids": [
+            "condition"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "checkpoint",
+      "name": "表达检查 · 阶段测验",
+      "kind": "checkpoint",
+      "sections": [
+        {
+          "type": "single_choice",
+          "count": 4,
+          "points": 2,
+          "topic_ids": [
+            "condition",
+            "cause",
+            "contrast",
+            "instructions"
+          ]
+        },
+        {
+          "type": "short_answer",
+          "count": 2,
+          "points": 4,
+          "topic_ids": [
+            "condition",
+            "cause"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mini-mock",
+      "name": "四组表达迷你模拟",
+      "kind": "mock",
+      "sections": [
+        {
+          "type": "single_choice",
+          "count": 8,
+          "points": 2,
+          "topic_ids": [
+            "condition",
+            "cause",
+            "contrast",
+            "instructions"
+          ]
+        },
+        {
+          "type": "short_answer",
+          "count": 4,
+          "points": 4,
+          "topic_ids": [
+            "condition",
+            "cause",
+            "contrast",
+            "instructions"
+          ]
+        }
+      ]
+    }
+  ]
+}

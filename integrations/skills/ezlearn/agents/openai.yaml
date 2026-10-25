@@ -1,0 +1,6 @@
+interface:
+  display_name: "ezlearn · 每天学一点"
+  short_description: "用熟悉的工作情境学习，练习并保存掌握证据"
+  default_prompt: "使用 ezlearn 帮我准备今天约 15 分钟的学习，先恢复未完成事项。"
+policy:
+  allow_implicit_invocation: true

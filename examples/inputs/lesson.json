@@ -1,0 +1,13 @@
+{
+  "goal_id": "REPLACE_WITH_GOAL_ID",
+  "title": "如果请求失败，我们就再试一次",
+  "objective": "用 if + 现在时、will + 动词原形表达条件与结果。",
+  "explanation": "If the request fails, we will retry it. 条件从句用一般现在时，主句用 will + 动词原形。主句在前也可以：We will retry the request if it fails.",
+  "example": "你正在补充 API 客户端的超时重试逻辑。If the connection times out, we will retry the request. 把 if 从句看成条件判断，把 will 后的动作看成条件满足后的行为。",
+  "context_summary": "原创演示：开发者编写 API 超时重试说明，不是导入用户聊天。",
+  "topic_ids": ["condition"],
+  "question_ids": ["condition-01", "condition-02", "condition-04"],
+  "kind": "daily",
+  "minutes": 15,
+  "idempotency_key": "daily:REPLACE_WITH_GOAL_ID:YYYY-MM-DD"
+}
