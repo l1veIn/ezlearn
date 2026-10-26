@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
+  API_VERSION,
+  PLATFORM_VERSION,
   AppError,
   errorResult,
   learnerOperations,
@@ -8,7 +10,8 @@ import {
   type Operation,
 } from '../contracts/index.js';
 import type { LearningService } from '../core/service.js';
-import { handleMcp } from '../mcp/index.js';
+import { z } from 'zod';
+import { loadGithubPack } from './pack-loader.js';
 
 export interface AppOptions {
   service: LearningService;
@@ -92,30 +95,49 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
     throw new AppError('INVALID_JSON', '请求需要 JSON 对象');
   }
 }
-function safePacks(data: unknown): unknown {
-  if (!Array.isArray(data)) return data;
-  return data.map((p) => ({
+function safePack(data: unknown): unknown {
+  const p = data as {
+    id: string;
+    version: string;
+    checksum: string;
+    source: unknown;
+    installed_at: string;
+    pack: { manifest: unknown; topics: unknown };
+  };
+  return {
     id: p.id,
     version: p.version,
     checksum: p.checksum,
     source: p.source,
     installed_at: p.installed_at,
     pack: { manifest: p.pack.manifest, topics: p.pack.topics },
-  }));
+  };
 }
+const packageOperations = new Set<Operation>([
+  'install_pack',
+  'validate_pack',
+  'get_pack',
+  'search_materials',
+]);
+const githubInput = z
+  .object({
+    repository: z.string().trim().min(1).max(500),
+    ref: z.string().trim().min(1).max(200),
+    validate_only: z.boolean().default(false),
+  })
+  .strict();
 export function createApp(options: AppOptions) {
   const app = new Hono();
   const expectedOrigin = new URL(options.baseUrl).origin;
   if (
-    options.mode === 'remote' &&
-    (!options.apiToken ||
-      options.apiToken.length < 24 ||
-      !options.sessionSecret ||
-      options.sessionSecret.length < 32)
+    !options.apiToken ||
+    options.apiToken.length < 24 ||
+    !options.sessionSecret ||
+    options.sessionSecret.length < 32
   )
     throw new AppError(
       'AUTH_CONFIG',
-      '远端需配置至少24字符 API token 和32字符 session secret',
+      '平台需配置至少24字符 API token 和32字符 session secret',
       503,
     );
   app.use('*', async (c, next) => {
@@ -144,12 +166,17 @@ export function createApp(options: AppOptions) {
     await next();
   });
   const isBearer = async (request: Request) =>
-    options.mode === 'local' ||
-    (await equalSecret(request.headers.get('authorization') || '', `Bearer ${options.apiToken}`));
-  const isUser = async (request: Request) =>
-    (await isBearer(request)) ||
-    (await validSession(request.headers.get('cookie') || undefined, options.sessionSecret || ''));
-  app.get('/health', (c) => c.json({ ok: true, version: '0.1.0' }));
+    await equalSecret(request.headers.get('authorization') || '', `Bearer ${options.apiToken}`);
+  const isUser = async (request: Request) => {
+    if (request.headers.has('authorization')) return isBearer(request);
+    return (
+      options.mode === 'local' ||
+      (await validSession(request.headers.get('cookie') || undefined, options.sessionSecret!))
+    );
+  };
+  app.get('/health', (c) =>
+    c.json({ ok: true, product: 'ezlearn', version: PLATFORM_VERSION, api_version: API_VERSION }),
+  );
   app.get('/api/auth', async (c) =>
     c.json({ ok: true, data: { mode: options.mode, authenticated: await isUser(c.req.raw) } }),
   );
@@ -178,36 +205,69 @@ export function createApp(options: AppOptions) {
     if (!(await isUser(c.req.raw))) throw new AppError('UNAUTHORIZED', '请先登录', 401);
     return c.json({ ok: true, data: await options.service.execute('dashboard', {}) });
   });
+  app.get('/api/platform', async (c) => {
+    if (!(await isUser(c.req.raw)))
+      throw new AppError('UNAUTHORIZED', '请先登录或提供实例凭证', 401);
+    return c.json({
+      ok: true,
+      data: {
+        product: 'ezlearn',
+        version: PLATFORM_VERSION,
+        api_version: API_VERSION,
+        deployment_mode: options.mode,
+        teacher_authenticated: await isBearer(c.req.raw),
+        endpoint: expectedOrigin,
+        capabilities: ['learning', 'packs.upload', 'packs.github', 'migration'],
+      },
+    });
+  });
+  app.post('/api/packs/github', async (c) => {
+    if (!(await isUser(c.req.raw)))
+      throw new AppError('UNAUTHORIZED', '请先登录或提供实例凭证', 401);
+    const input = githubInput.parse(await readJson(c.req.raw));
+    const loaded = await loadGithubPack(input.repository, input.ref);
+    const data = await options.service.execute(
+      input.validate_only ? 'validate_pack' : 'install_pack',
+      input.validate_only ? { pack: loaded.pack } : loaded,
+    );
+    return c.json({
+      ok: true,
+      data: input.validate_only ? { ...data, source: loaded.source } : safePack(data),
+    });
+  });
   app.post('/api/rpc/:operation', async (c) => {
     if (!(await isUser(c.req.raw)))
       throw new AppError('UNAUTHORIZED', '请先登录或提供 Agent 凭证', 401);
     const operation = c.req.param('operation') as Operation;
     if (!operations.includes(operation)) throw new AppError('UNKNOWN_OPERATION', '未知操作', 404);
     const bearer = await isBearer(c.req.raw);
-    // Local CLI bypasses HTTP. Browser requests never become teacher requests without an explicit Bearer credential.
-    const teacher = bearer && c.req.header('authorization')?.startsWith('Bearer ');
-    if (!learnerOperations.has(operation) && !teacher)
+    // Local and remote CLI clients use the same credential-checked teacher API.
+    const teacher = bearer;
+    if (!learnerOperations.has(operation) && !packageOperations.has(operation) && !teacher)
       throw new AppError('FORBIDDEN', '此操作需由 Agent 使用管理凭证调用', 403);
     const input = await readJson(c.req.raw);
     if (operation === 'get_lesson' || operation === 'get_attempt') input.teacher = !!teacher;
     const data = await options.service.execute(operation, input);
     return c.json({
       ok: true,
-      data: operation === 'list_packs' && !teacher ? safePacks(data) : data,
+      data:
+        !teacher && operation === 'list_packs'
+          ? (data as unknown[]).map(safePack)
+          : !teacher && (operation === 'get_pack' || operation === 'install_pack')
+            ? safePack(data)
+            : data,
     });
   });
-  app.all('/mcp', async (c) => {
-    if (!(await isBearer(c.req.raw)))
-      throw new AppError('UNAUTHORIZED', 'MCP 需要 Bearer 凭证', 401);
-    return handleMcp(c.req.raw, options.service);
-  });
+  app.all('/mcp', (c) =>
+    c.json({ ok: false, error: { code: 'NOT_FOUND', message: '当前平台使用 HTTP API 接入' } }, 404),
+  );
   app.all('/api/*', (c) =>
     c.json({ ok: false, error: { code: 'NOT_FOUND', message: '接口不存在' } }, 404),
   );
   app.get('*', async (c) =>
     options.assets
       ? options.assets(c.req.raw)
-      : c.text('Web 尚未构建，请先运行 pnpm build，再运行 pnpm ezlearn start。', 503),
+      : c.text('Web 尚未构建，请先运行 pnpm build，再启动学习平台。', 503),
   );
   app.onError((error, c) => {
     const result = errorResult(error);

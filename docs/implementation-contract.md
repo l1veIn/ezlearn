@@ -1,10 +1,14 @@
-# v0.1 集成契约（内部）
+# 平台 HTTP 集成契约（内部）
+
+产品边界见决策 0001。下列是保留的学习核心契约，CLI 和 Web 均从 HTTP 进入；平台是唯一业务与存储拥有者。本地启动与 profile 是管理能力，不构成数据库直连学习路径。MCP 不属于当前接口。
 
 业务统一入口 `LearningService.execute(operation, input)`，位于 `src/core/service.ts`。
 构造 `new LearningService(store, { baseUrl, backendId? })`。`store` 实现 `src/storage/types.ts` 的 SnapshotStore。
 所有传输层捕获 `AppError`，使用 `{ok:true,data}` / `{ok:false,error:{code,message,details?}}`。
 HTTP `POST /api/rpc/:operation` 接收 input 对象；`GET /api/dashboard` 等价 dashboard。
-本地公开读取不泄露答案：`get_lesson {id, teacher?:boolean}` 默认 false；教师 CLI/MCP 传 true。
+公开学习读取不泄露答案：`get_lesson {id, teacher?:boolean}` 默认 false；HTTP 边界根据真实教师凭证确定权限，不能信任客户端自行传 teacher:true。
+
+平台 GitHub 包入口为 `POST /api/packs/github`，输入 `{repository,ref,validate_only?}`，平台获取并校验后安装或仅校验。Web 上传纯数据包与 CLI 上传共用平台校验。`GET /health` 标识产品及 API 版本；状态与业务读写需完成相应认证。
 
 ## 操作与数据
 

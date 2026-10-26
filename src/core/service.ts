@@ -1,4 +1,6 @@
 import {
+  PLATFORM_VERSION,
+  API_VERSION,
   AppError,
   fail,
   operationSchemas,
@@ -109,7 +111,8 @@ export class LearningService {
     switch (op) {
       case 'get_status':
         return {
-          version: '0.1.0',
+          version: PLATFORM_VERSION,
+          api_version: API_VERSION,
           backend_id: this.backendId,
           base_url: this.baseUrl,
           revision,

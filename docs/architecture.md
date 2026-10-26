@@ -1,60 +1,84 @@
-# 架构与数据
+# 平台架构与数据
 
-## 一条业务路径
+产品边界由[决策 0001](decisions/0001-platform-first.md)确定。平台拥有学习业务与持久化，Web 和终端操作都进入同一个 HTTP 边界。
 
-`src/contracts` 以 Zod 定义输入、实体与机器错误；`src/core` 负责包引用校验、选题、快照、作答状态、评分、进度和迁移。CLI、HTTP Web 与 MCP 都调用 `LearningService.execute(operation, input)`，不另写阅卷规则。
-
-```mermaid
+~~~mermaid
 flowchart LR
-  Agent[宿主 Agent] --> CLI[本地 CLI]
-  Agent --> MCP[Streamable HTTP MCP]
-  Browser[中文 Web] --> HTTP[Hono HTTP]
-  CLI --> Core[LearningService + Zod]
-  MCP --> Core
-  HTTP --> Core
-  Core --> CAS[SnapshotStore CAS]
-  CAS --> SQLite[本地 SQLite]
-  CAS --> D1[Cloudflare D1]
-  CAS --> LibSQL[Vercel 外部 libSQL]
-```
+  Skill[Skill 操作指南] -.指导.-> Agent[外部 Agent]
+  Agent --> CLI[实例管理与操作 CLI]
+  User[学习者] --> Web[Web 学习界面]
+  CLI --> HTTP[平台 HTTP API]
+  Web --> HTTP
+  HTTP --> Core[LearningService + Zod]
+  Core --> Storage[SnapshotStore CAS]
+  Storage --> SQLite[本地 SQLite]
+  Storage --> D1[Cloudflare D1]
+  Storage --> LibSQL[外部 libSQL]
+~~~
 
-`src/cli` 处理参数、profile 和受限的包读取；`src/server` 负责认证、同源保护、RPC 和静态文件；`src/mcp` 负责官方 SDK 工具发现与调用；`web` 只呈现学习与提交数据。核心没有 Node 文件系统依赖。所有文本都作为不可信内容呈现，材料中的文字不会升级为平台指令。
+## 模块与依赖方向
+
+- `src/contracts` 定义输入 schema、实体、版本与机器错误。
+- `src/core` 负责包引用、选题、快照、状态、评分、证据、复习和逻辑迁移，不依赖 Node 文件系统。
+- `src/storage` 适配 SQLite、D1 和 libSQL 的实际原子更新。
+- 平台启动入口组合运行时、存储、HTTP 和静态 Web。`src/platform` 可独立启动本机平台，CLI 的 start 是它的便捷管理入口。
+- `src/server` 负责认证、同源保护、HTTP 路由、GitHub 包获取和资源呈现。所有学习操作调用 `LearningService.execute`。
+- `src/cli` 负责参数、命名 profile、端点、凭证引用、结构化输入输出和 HTTP 调用。学习命令不访问数据库，也不在连接失败时切换存储路径。
+- `web` 呈现学习、答题和包管理。Skill 引用 CLI 帮助与简短流程；MCP 不属于当前默认依赖或发布接口。
+
+CLI 的本地文件读取只是上传/下载边界：它可以把一个本地 pack.json 传给平台、将导出保存到文件。格式与引用校验、包版本安装和评分由平台执行。GitHub 仓库由平台按明确 ref 获取，云实例的包不存放在 CLI 私有目录。
+
+## 连接与认证
+
+客户端只理解 endpoint 与凭证引用。命名 profile 方便管理实例，没有 local/remote 两套学习逻辑；`--profile` 或 `--endpoint` 可以覆盖单次选择。端点是平台实例地址，课程 URL 由平台返回。
+
+本地平台只监听回环地址，并在实例目录生成连接凭证。CLI 仅在端点匹配时读取该实例的 connection.json，凭证不出现在 JSON 输出、课程链接和交接文本中。远端凭证通过 profile 的 token_env 从进程环境读取。
+
+Web 学习读取返回安全视图，完成评价前不暴露答案键、rubric 和解析。教师操作验证 Bearer；远端 Web 登录换取 HttpOnly、SameSite 会话。来源校验、请求大小限制和纯文本呈现由 HTTP 边界处理。单用户认证不代表团队权限系统。
 
 ## 有界聚合与原子性
 
-v0.1 面向个人小型文本学习实例，SQL 中以一个带 revision 的聚合状态保存各实体映射。状态上限 **1,500,000 UTF-8 字节**，超限返回 `CAPACITY_EXCEEDED`，不会丢弃历史。材料正文内联于包，课程持有题目和材料快照，因此无需 R2 或独立附件服务。当前不支持二进制资产；重度使用者应在容量接近上限时导出备份，并等待后续分表版本。
+当前 SQL 以一个带 revision 的聚合状态保存实体映射。状态上限 **1,500,000 UTF-8 字节**，超限返回 `CAPACITY_EXCEEDED`，不会删除历史。单包最多 384,000 字节。材料正文内联于包，课程保存题目和材料快照；当前无二进制资产或独立附件服务。
 
-一次业务变更先读取 revision 与状态，在副本中校验和计算，再执行单条条件更新 `UPDATE ... WHERE revision = ?`。写入冲突会有限重读重算；过期的用户 `expected_version` 会明确拒绝。SQLite、D1、libSQL 都真实执行该原子 SQL，不把 D1 不支持的交互式事务包装成通用事务。首次建表与 schema version 见 `migrations`；主键定位唯一实例行，索引由主键提供。各实体的列表和关联检索在有界快照内完成，未伪称具有大规模数据库检索性能。
+一次变更读取 revision 与状态，在副本校验计算，再执行单条 `UPDATE ... WHERE revision = ?`。写入冲突有限重读重算，用户 expected_version 过期明确拒绝。SQLite、D1、libSQL 都执行真实 CAS SQL，不把 D1 不支持的交互式事务包装成通用接口。迁移见 migrations，主键定位唯一实例行；实体列表与关联检索在有界快照内完成。
+
+这是保留现有数据的一次边界重构。后续分表扩容有独立存储版本和迁移，不与 HTTP 客户端改造混做。
 
 ## 实体与历史
 
-`PackVersion` 保存准确版本、内容、checksum、安装来源与实际解析的 GitHub commit；`Goal` 固定关联包版本。包升级安装为新版本，历史版本保留，已有目标不会静默切到新内容。
+PackVersion 保存准确版本、内容、checksum、来源及解析的 GitHub commit；Goal 固定关联包版本。升级安装为新版本，旧版本保留，已有目标不会静默换内容。
 
-`Lesson` 保存讲解、情境摘要、topic、kind、题目/材料快照与发布状态。`Attempt` 保存逐题答案、版本与 `in_progress → submitted → reviewed` 状态；同课程可以用新幂等键重做。`Review` 保存逐题成绩和反馈，修改需版本与理由，并保留修订记录。`Evidence` 将每道题的得分与目标、知识点、评价版本关联；`Progress` 区分曝光与答题证明，并保存复习时间。所有 ID 稳定，时间存 ISO UTC，Web 按浏览器本地时区呈现。
+Lesson 保存讲解、情境摘要、topic、kind 和题目/材料快照。Attempt 保存答案、版本和 `in_progress → submitted → reviewed` 状态；同课可以重做。Review 保存逐题成绩与反馈，修改需要当前版本和修订依据。Evidence 将题目得分关联目标、topic、作答及评价版本；Progress 区分曝光与练习证据。ID 稳定，时间存 ISO UTC，Web 按浏览器时区呈现。
 
-重复发布、相同答案提交和相同阅卷幂等键不会重复计算进度；同一幂等键配不同业务内容会拒绝。新评价修订会更新对应证据，避免把同一答题重复计入。
+重复发布、相同答案提交、相同阅卷幂等键不重复累积证据；相同 key 配不同内容拒绝。修订重建对应证据，不能把一次作答算成多次。发布内容不随学习包更新改变。
 
-复习规则以本轮同一知识点的得分率决定：低于 60% 在提交后 1 天复习，60%～不足 85% 在 3 天后复习，85% 及以上在 7 天后复习。累计得分率达到 85% 且至少有 2 道题证据时标记 `demonstrated`；60% 及以上为 `practicing`，其他已答题为 `learning`，没有评价证据为 `unknown`。`correct` 是满分题数，`earned/possible` 反映部分分；发布课程只增加 exposures。选题优先待处理事项、到期与薄弱知识，并递归检查未证明掌握的前置主题。该规则只表达已有证据，不推断考试通过率。
+## 公开复习规则
 
-## 命令与工具映射
+本轮某知识点得分率低于 60%，在提交后 1 天复习；60%～不足 85% 为 3 天；85% 及以上为 7 天。累计得分率至少 85% 且有至少 2 道题证据标记 demonstrated，至少 60% 为 practicing，其余已评价为 learning，没有评价为 unknown。
 
-| CLI | MCP / 核心操作 |
+correct 是满分题数，earned/possible 保留部分分；发布课程只增加 exposures。选题先处理待办、到期与薄弱点，再检查未证明掌握的前置主题。这些指标表达已观察证据，不推断考试通过概率。
+
+## HTTP 与 CLI
+
+学习 RPC 接口为 `POST /api/rpc/:operation`，输入为 JSON 对象；结果封套统一为 `{ok:true,data}` 或 `{ok:false,error:{code,message,details?}}`。CLI --json 的 stdout 仅输出封套，日志写 stderr。
+
+| CLI | 平台业务操作 |
 | --- | --- |
-| `status` / `profile` | `get_status`；profile 是客户端配置 |
-| `pack install/list/show/validate` | `install_pack/list_packs/get_pack/validate_pack` |
-| `material search` | `search_materials` |
-| `goal create/list/show/update` | `create_goal/list_goals/get_goal/update_goal` |
-| `progress` / `review due` | `get_progress/get_due_reviews` |
-| `plan next` | `plan_next_session` |
-| `lesson create/publish/show` | `create_lesson/publish_lesson/get_lesson` |
-| `attempt start/draft/submit/pending/show` | 对应 attempt 核心操作 |
-| `review submit` | `submit_review` |
-| `export` / `import` | `export_data/validate_import/import_data` |
+| status | get_status |
+| profile show/list/set/use | 客户端配置，不修改学习记录 |
+| platform start/doctor | 本地启动 / 当前端点诊断 |
+| pack install/list/show/validate | 平台包安装、查询与校验；GitHub 获取在平台执行 |
+| material search | search_materials |
+| goal create/list/show/update | create_goal/list_goals/get_goal/update_goal |
+| progress / review due | get_progress/get_due_reviews |
+| plan next | plan_next_session |
+| lesson create/publish/show | create_lesson/publish_lesson/get_lesson |
+| attempt start/draft/submit/pending/show | 作答状态操作 |
+| review submit | submit_review |
+| export / import | export_data/validate_import/import_data |
 
-CLI 的 `--json` 输出封套为 `{ok:true,data}` 或 `{ok:false,error:{code,message,details?}}`。日志写 stderr。HTTP 与 MCP 复用相同错误语义；MCP 另外遵守协议的 tool result 错误标志。题目答案键、rubric 和解析由教师读取；学习端未完成评价前只得到作答所需数据。
+## 部署与平台生命周期
 
-## 运行时差异
+本机平台使用 SQLite 与本地实例目录；Workers 通过 D1 binding，Vercel 使用外部 libSQL。平台部署差异封装在服务端，CLI 只换端点与凭证。Vercel 临时文件系统不保存正式学习数据库。
 
-本地 CLI 直接使用 SQLite，即使 Web 停止也可备课与阅卷。Web 必须显式启动。Workers 通过 D1 binding 读写，Vercel 使用外部 libSQL；Vercel 函数本地文件系统不作为数据源。Web 构建为同一份静态文件，认证和公开 base URL 由部署配置传入。
-
-远程 Web 使用 HttpOnly 会话 cookie；教师 MCP/管理 RPC 使用 Bearer 凭证。凭证只从环境读取，导出不包含这些部署配置。单用户 token 机制不代替团队或 OAuth 身份系统。
+安装器与自动升级尚未交付。平台与发布系统将负责版本元信息、升级检查、备份、数据迁移、失败恢复和回滚，CLI 提供操作入口。学习包升级、应用升级与用户数据迁移各有版本语义，均不能改写历史依据。具体阶段见路线图。

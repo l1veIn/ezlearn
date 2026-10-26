@@ -1,73 +1,97 @@
-# 本地与自部署
+# 本地与云端平台部署
 
-平台不需要模型 API Key。云端代码与构建配置已提供；账号、数据库、域名与凭证由用户配置。项目开发过程不执行真实云发布或资源创建。各运行时实际验证状态见 README。
+ezlearn 平台可以独立运行，统一提供 Web 和 HTTP API。CLI 连接端点，不根据部署位置选择不同学习逻辑。平台不需要模型 API Key；实例配置、学习数据与客户端连接配置各有边界。
 
-## 本地
+## 本机平台
 
-要求 Node.js 24+ 与 pnpm。仓库尚未发布 npm 包，请从源码运行：
+要求 Node.js 24+、pnpm 11.16.0。当前从源码构建，未发布 npm 包或下载版安装器：
 
-```powershell
+~~~powershell
 pnpm install --frozen-lockfile
 pnpm build
+pnpm platform:start
+~~~
+
+保留此终端，在另一个终端执行：
+
+~~~powershell
 node examples/prepare-demo.mjs
-pnpm ezlearn start
-```
+~~~
 
-默认监听 `127.0.0.1:3210`，SQLite 与 profile 在当前目录 `.ezlearn/`。首次打开 `http://127.0.0.1:3210`。数据目录可用 `--data-dir` 或 `EZLEARN_DATA_DIR` 固定；链接 base URL 用 `--base-url` 或 `EZLEARN_BASE_URL`。本地仅接受回环 Host，不提供暴露到公网的开关；跨设备访问请部署有认证的远端模式。
+也可直接运行构建后的独立平台：
 
-本地没有常驻守护进程，关掉终端就停止 Web。CLI 仍能在 Web 停止时直接备课、阅卷和导出。每次启动会幂等初始化本地 schema；用户数据和构建产物已加入 Git 忽略。
+~~~powershell
+node dist/platform/index.js --data-dir .ezlearn --port 3210 --base-url http://127.0.0.1:3210
+~~~
+
+`pnpm ezlearn start` 或 `pnpm ezlearn platform start` 提供同一启动能力。默认只绑定 127.0.0.1，Web 在 http://127.0.0.1:3210，学习数据库在实例目录 learning.sqlite。本地平台生成 connection.json，供匹配端点的 CLI 读取实例凭证，不在状态输出或课程链接显示凭证。
+
+--data-dir / EZLEARN_DATA_DIR 选择实例目录；--port 选择监听端口；--base-url / EZLEARN_BASE_URL 是平台生成链接和检查来源的公开地址。改变端口时应同步 base URL；当前本地地址必须为 http://127.0.0.1:<port>。跨设备访问请部署有认证的远端平台。
+
+同一数据目录只允许一个活跃平台，换端口也不能同时启动第二个。Windows 使用命名管道，Linux 使用抽象 Unix socket，进程退出或异常结束后由系统释放目录锁。其他 Unix 使用普通 socket；异常退出留下锁文件时会保守拒绝启动，确认没有活跃实例后再人工清理报错中指定的锁路径，不会自动删除未知锁。
+
+CLI 的 --config-dir 选择客户端配置目录，默认使用 --data-dir。学习命令的 --endpoint / EZLEARN_ENDPOINT 或命名 profile 选择服务地址。平台停止时不能离线备课、阅卷或导出；保持平台运行，再调用学习操作。
+
+没有常驻守护进程。当前终端退出即停止该本机进程，需要后台运行时由实例所有者选择进程管理器。诊断当前端点：
+
+~~~powershell
+pnpm ezlearn platform doctor --json
+pnpm ezlearn status --json
+~~~
 
 ## Cloudflare Workers + D1
 
-入口 `deploy/cloudflare/worker.ts`，配置 `deploy/cloudflare/wrangler.jsonc`。`DB` 是 D1 binding，`ASSETS` 是构建后的 Web；纯文本材料随包保存于数据库，不需要 R2。兼容日期与 Wrangler 类型生成随配置固定。
+入口 deploy/cloudflare/worker.ts，配置 deploy/cloudflare/wrangler.jsonc。DB 是 D1 binding，ASSETS 是同一份构建 Web；纯文本学习包保存在数据库，不需要 R2。
 
-只做本地模拟：
+本地模拟：
 
-```powershell
+~~~powershell
 pnpm build
 pnpm exec wrangler d1 migrations apply ezlearn --local --config deploy/cloudflare/wrangler.jsonc
-pnpm exec wrangler types --config deploy/cloudflare/wrangler.jsonc
+pnpm exec wrangler types --config deploy/cloudflare/wrangler.jsonc --include-runtime=false --env-interface CloudflareEnv deploy/cloudflare/worker-configuration.d.ts
 pnpm build:cloudflare
 pnpm exec wrangler dev --local --config deploy/cloudflare/wrangler.jsonc
-```
+~~~
 
-在 `deploy/cloudflare/.dev.vars` 设置随机的 `EZLEARN_API_TOKEN`（至少 24 字符）与 `EZLEARN_SESSION_SECRET`（至少 32 字符），勿提交文件。配置默认本地 base URL 为 `http://127.0.0.1:8787`，修改 dev 端口也必须同步 base URL。使用本地模拟时不要加 `--remote`。
+在 deploy/cloudflare/.dev.vars 中提供 EZLEARN_API_TOKEN（至少 24 个随机字符）和 EZLEARN_SESSION_SECRET（至少 32 个随机字符），不要提交该文件。默认本地 base URL 为 http://127.0.0.1:8787；本地模拟不要加 --remote。CLI profile 指向该端点，并用 token_env 引用匹配的进程环境变量。
 
-真正部署需要用户明确决定后执行：
+实际部署由实例所有者执行：
 
-1. 用 `pnpm exec wrangler login` 登录自己的账号。
-2. `pnpm exec wrangler d1 create ezlearn` 创建数据库，将返回的 database_id 写入配置，替换全零占位值。确认数据库属于预期账号。
-3. 把配置中的 `EZLEARN_BASE_URL` 改成实际 HTTPS 域名，设置稳定 `EZLEARN_BACKEND_ID`。
-4. 通过 `pnpm exec wrangler secret put EZLEARN_API_TOKEN --config deploy/cloudflare/wrangler.jsonc` 和同样方式设置 `EZLEARN_SESSION_SECRET`。交互输入凭证，不写到命令参数或仓库。
+1. `pnpm exec wrangler login` 登录预期账号。
+2. `pnpm exec wrangler d1 create ezlearn`，将实际 database_id 写入配置替换全零占位值。
+3. 将 EZLEARN_BASE_URL 改为实际 HTTPS 域名，设置稳定 EZLEARN_BACKEND_ID。
+4. 用 `pnpm exec wrangler secret put EZLEARN_API_TOKEN --config deploy/cloudflare/wrangler.jsonc` 和同样方式设置 EZLEARN_SESSION_SECRET，交互输入，不写入命令参数。
 5. `pnpm exec wrangler d1 migrations apply ezlearn --remote --config deploy/cloudflare/wrangler.jsonc`。
-6. `pnpm build` 后执行 `pnpm exec wrangler deploy --config deploy/cloudflare/wrangler.jsonc`。
+6. `pnpm build` 后 `pnpm exec wrangler deploy --config deploy/cloudflare/wrangler.jsonc`。
 
-部署前先安装包或按[迁移文档](migration.md)导入。Web 登录后可答题；Agent 连接 `/mcp` 或有 Bearer 的管理 RPC。D1 schema 文件在 `migrations/0001_state.sql`。
+Web 登录后可管理包和学习；Agent 的 CLI 以同一 HTTP API 访问实例。这里没有默认 MCP 入口。仅构建或本地模拟通过不代表已经实际云部署。
 
-## Vercel Functions + libSQL/Turso
+## Vercel Functions + 外部 libSQL/Turso
 
-入口 `deploy/vercel/api.ts`，构建脚本生成 Vercel Build Output：静态 Web 与 `api.func`。使用 Node.js 24 runtime，学习状态写到外部 libSQL，不能使用函数本地 SQLite 或 `/tmp` 作为正式数据。
+入口 deploy/vercel/api.ts，构建脚本生成 Vercel Build Output 的静态 Web 与 api.func，使用 Node.js 24。正式数据保存在外部 libSQL，函数 /tmp 或本地 SQLite 不能作为持久学习数据库。
 
-```powershell
+~~~powershell
 pnpm build
 pnpm build:vercel
-```
+~~~
 
-在自己的外部 libSQL/Turso 服务创建空数据库，设置部署环境：
+部署环境：
 
 | 变量 | 用途 |
 | --- | --- |
-| `TURSO_DATABASE_URL` | `libsql://...` 外部数据库 URL |
-| `TURSO_AUTH_TOKEN` | 数据库访问凭证 |
-| `EZLEARN_BASE_URL` | 实际 HTTPS 域名，必须与浏览器来源一致 |
-| `EZLEARN_BACKEND_ID` | 稳定实例标识 |
-| `EZLEARN_API_TOKEN` | 至少 24 字符，教师与首次 Web 登录凭证 |
-| `EZLEARN_SESSION_SECRET` | 至少 32 字符，Web 会话 HMAC 密钥 |
+| TURSO_DATABASE_URL | libsql://... 外部数据库 URL |
+| TURSO_AUTH_TOKEN | 数据库凭证 |
+| EZLEARN_BASE_URL | 实际 HTTPS 域名，与浏览器来源一致 |
+| EZLEARN_BACKEND_ID | 稳定实例标识 |
+| EZLEARN_API_TOKEN | 至少 24 字符，教师 API 与 Web 首次登录凭证 |
+| EZLEARN_SESSION_SECRET | 至少 32 字符，Web 会话 HMAC 密钥 |
 
-在已安全设置上述数据库环境变量的终端执行一次 `pnpm exec tsx deploy/vercel/initialize.ts`，幂等初始化 schema 与空状态。函数不会在每次请求时自动执行迁移。Build Output 生成后，用户可使用自己安装并登录的 Vercel CLI 执行 `vercel deploy --prebuilt`；项目构建设置使用 `pnpm build && pnpm build:vercel`，并使用仓库的 lockfile。没有账号/凭证时仅本地生成产物，不能声称部署成功。
+安全设置数据库环境变量后执行一次 `pnpm exec tsx deploy/vercel/initialize.ts`，幂等初始化 schema。函数不会在每次请求时自动迁移。用户安装并登录 Vercel CLI 后，可执行 `vercel deploy --prebuilt`；项目构建命令为 `pnpm build && pnpm build:vercel`。没有账号或凭证时只生成产物，不创建云资源。
 
-## 认证与恢复
+## 认证、数据与更新
 
-远端 Web 输入部署访问 token 后，服务器签发 HttpOnly、SameSite=Strict 的会话 cookie，HTTPS 下有 Secure 标志，有效期 7 天；页面不保存教师 token。教师 MCP/管理 API 使用 Bearer，普通学习会话不能访问题目答案键或提交教师评价。修改请求受配置 base URL 的同源检查保护。这个版本为单用户实例，不是多用户登录系统。
+远端 Web 登录换取 HttpOnly、SameSite=Strict 会话，HTTPS 下有 Secure 标志；教师 HTTP API 使用 Bearer。本地平台也验证真正的实例教师凭证，不以任意 Authorization 字符串充当教师身份。学习页面不持有教师 token，未评价题目的答案键不通过学习接口暴露。
 
-`/health` 只显示服务版本，不表示数据库迁移与凭证已经正确。用带认证的 `get_status`、安装/读取一个测试包和实际课程流程验收部署。base URL 错误会产生来源校验或错误链接，请先修配置。密钥轮换、数据库备份和故障恢复由实例所有者负责；学习逻辑备份使用 export，不包含部署密钥。
+/health 是服务可达与协议标识，不替代数据库与学习业务检查。诊断后应安装测试包、读写一轮课程并核对持久化。base URL 错误会造成来源拒绝或错误课程链接。
+
+应用版本生命周期归平台与发布系统；CLI 是管理入口。当前源码版本尚无在线更新器，后续先交付发布制品、升级检查、备份/迁移和失败回滚，再提供用户可启用的自动升级。学习逻辑备份使用 export，不含部署密钥，详见[迁移文档](migration.md)和[路线图](roadmap.md)。

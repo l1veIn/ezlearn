@@ -77,7 +77,7 @@ type Pack = {
   pack?: { manifest: Manifest; topics?: { id: string; title: string }[] };
   manifest?: Manifest;
   topics?: { id: string; title: string }[];
-  source?: { kind: string; url?: string; resolved?: string };
+  source?: { kind: string; url?: string; ref?: string; resolved?: string };
 };
 type Manifest = {
   id: string;
@@ -97,6 +97,7 @@ type Dashboard = {
   due_reviews: Progress[];
   backend_id: string;
   base_url: string;
+  platform_version?: string;
 };
 type AttemptDetail = { attempt: Attempt; lesson: Lesson; review?: Review; handoff_prompt: string };
 const EMPTY: Dashboard = {
@@ -134,7 +135,7 @@ async function request<T>(url: string, input?: unknown): Promise<T> {
   try {
     result = await response.json();
   } catch {
-    throw new ApiError('NETWORK_ERROR', '服务暂时没有响应，请确认 ezlearn start 正在运行。');
+    throw new ApiError('NETWORK_ERROR', '服务暂时没有响应，请确认当前学习平台实例正在运行。');
   }
   if (!response.ok || result.ok === false)
     throw new ApiError(
@@ -362,8 +363,11 @@ function App() {
   }, []);
   const reload = useCallback(async () => {
     try {
-      const dashboard = await request<Dashboard>('/api/dashboard');
-      setData({ ...EMPTY, ...dashboard });
+      const [dashboard, platform] = await Promise.all([
+        request<Dashboard>('/api/dashboard'),
+        request<{ version: string }>('/api/platform'),
+      ]);
+      setData({ ...EMPTY, ...dashboard, platform_version: platform.version });
       setLogin(false);
       setError('');
     } catch (e) {
@@ -434,7 +438,9 @@ function App() {
           <div className="connection">
             <span className={`status-dot ${error || login ? 'offline' : ''}`} />
             <span>{login ? '等待登录' : error ? '连接暂不可用' : '学习札记已就绪'}</span>
-            <span className="version">v0.1</span>
+            <span className="version">
+              {data.platform_version ? `v${data.platform_version}` : '—'}
+            </span>
           </div>
         </div>
       </aside>
@@ -1391,6 +1397,171 @@ function HistoryPage({ data }: { data: Dashboard }) {
   );
 }
 
+function PackInstaller({
+  reload,
+  notify,
+}: {
+  reload: () => Promise<void>;
+  notify: (message: string) => void;
+}) {
+  const [repository, setRepository] = useState('');
+  const [ref, setRef] = useState('');
+  const [upload, setUpload] = useState<{ name: string; pack: unknown }>();
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  async function chooseFile(file?: File) {
+    setUpload(undefined);
+    setError('');
+    setMessage('');
+    if (!file) return;
+    if (file.size > 384000) {
+      setError('学习包 JSON 不能超过 384,000 字节。');
+      return;
+    }
+    try {
+      setUpload({ name: file.name, pack: JSON.parse(await file.text()) });
+    } catch {
+      setError('这个文件不是有效的 JSON，请选择学习包仓库中的 pack.json。');
+    }
+  }
+  async function useUpload(install: boolean) {
+    if (!upload || busy) return;
+    setBusy(install ? 'upload-install' : 'upload-validate');
+    setError('');
+    setMessage('');
+    try {
+      const validation = await rpc<{ id: string; version: string }>('validate_pack', {
+        pack: upload.pack,
+      });
+      if (install) {
+        await rpc('install_pack', {
+          pack: upload.pack,
+          source: { kind: 'local', url: 'browser-upload' },
+        });
+        await reload();
+        setMessage(`已安装 ${validation.id}@${validation.version}。`);
+        notify('书架已更新。');
+      } else setMessage(`校验通过：${validation.id}@${validation.version}，可以安装。`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy('');
+    }
+  }
+  async function useGithub(install: boolean) {
+    if (busy) return;
+    setBusy(install ? 'github-install' : 'github-validate');
+    setError('');
+    setMessage('');
+    try {
+      const result = await request<Pack & { valid?: boolean; id: string; version: string }>(
+        '/api/packs/github',
+        { repository: repository.trim(), ref: ref.trim(), validate_only: !install },
+      );
+      if (install) {
+        await reload();
+        setMessage(`已安装 ${result.id}@${result.version}。`);
+        notify('书架已更新。');
+      } else setMessage(`校验通过：${result.id}@${result.version}，可以安装。`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy('');
+    }
+  }
+  return (
+    <div className="pack-installer">
+      <div className="pack-install-heading">
+        <h3>把下一份好教材，放上书架。</h3>
+        <p>从 GitHub 指定版本安装，或上传学习包的 pack.json。内容由当前平台保存。</p>
+      </div>
+      <div className="pack-install-grid">
+        <form
+          className="pack-install-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void useGithub(true);
+          }}
+        >
+          <span className="small-label">来自 GITHUB 仓库</span>
+          <label>
+            学习包仓库
+            <input
+              value={repository}
+              onChange={(e) => setRepository(e.target.value)}
+              placeholder="https://github.com/作者/学习包"
+              required
+              maxLength={500}
+              disabled={!!busy}
+            />
+          </label>
+          <label>
+            版本或提交
+            <input
+              value={ref}
+              onChange={(e) => setRef(e.target.value)}
+              placeholder="例如 v1.0.0、main 或 commit"
+              required
+              maxLength={200}
+              disabled={!!busy}
+            />
+          </label>
+          <div className="pack-install-actions">
+            <button
+              type="button"
+              className="button subtle"
+              disabled={!!busy || !repository.trim() || !ref.trim()}
+              onClick={() => void useGithub(false)}
+            >
+              {busy === 'github-validate' ? '正在校验…' : '校验 GitHub 学习包'}
+            </button>
+            <button className="button primary" disabled={!!busy}>
+              {busy === 'github-install' ? '正在安装…' : '安装 GitHub 学习包'}
+            </button>
+          </div>
+        </form>
+        <div className="pack-install-form">
+          <span className="small-label">来自本地文件</span>
+          <label>
+            选择学习包 JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              disabled={!!busy}
+              onChange={(e) => void chooseFile(e.currentTarget.files?.[0])}
+            />
+          </label>
+          <p className="field-help">
+            {upload ? `${upload.name} 已选择。` : '选择仓库中的 pack.json，最大 384,000 字节。'}{' '}
+            平台会检查内容、依赖与材料引用。
+          </p>
+          <div className="pack-install-actions">
+            <button
+              type="button"
+              className="button subtle"
+              disabled={!!busy || !upload}
+              onClick={() => void useUpload(false)}
+            >
+              {busy === 'upload-validate' ? '正在校验…' : '校验上传的学习包'}
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              disabled={!!busy || !upload}
+              onClick={() => void useUpload(true)}
+            >
+              {busy === 'upload-install' ? '正在安装…' : '安装上传的学习包'}
+            </button>
+          </div>
+        </div>
+      </div>
+      {error && <Notice error>{error}</Notice>}
+      {message && <Notice>{message}</Notice>}
+    </div>
+  );
+}
+
 function SettingsPage({
   data,
   reload,
@@ -1401,19 +1572,22 @@ function SettingsPage({
   notify: (message: string) => void;
 }) {
   const [title, setTitle] = useState('');
-  const [packId, setPackId] = useState(manifest(data.packs[0] ?? {})?.id ?? '');
+  const firstPack = manifest(data.packs[0] ?? {});
+  const [packKey, setPackKey] = useState(firstPack ? `${firstPack.id}@${firstPack.version}` : '');
   const [minutes, setMinutes] = useState(15);
   const [examDate, setExamDate] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(data.goals.length === 0);
   const [editing, setEditing] = useState<string>();
-  const uniquePacks = Array.from(new Map(data.packs.map((p) => [manifest(p)?.id, p])).values());
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
+      const selectedPack = data.packs
+        .map(manifest)
+        .find((m) => m && `${m.id}@${m.version}` === packKey);
       await rpc(
         editing ? 'update_goal' : 'create_goal',
         editing
@@ -1425,7 +1599,8 @@ function SettingsPage({
             }
           : {
               title,
-              pack_id: packId || manifest(uniquePacks[0] ?? {})?.id,
+              pack_id: selectedPack?.id,
+              pack_version: selectedPack?.version,
               daily_minutes: minutes,
               ...(examDate ? { exam_date: examDate } : {}),
             },
@@ -1523,13 +1698,13 @@ function SettingsPage({
               {!editing && (
                 <label className="wide-field">
                   关联学习包
-                  <select required value={packId} onChange={(e) => setPackId(e.target.value)}>
+                  <select required value={packKey} onChange={(e) => setPackKey(e.target.value)}>
                     <option value="">选择已安装学习包</option>
-                    {uniquePacks.map((p) => {
+                    {data.packs.map((p) => {
                       const m = manifest(p);
                       return (
                         m && (
-                          <option value={m.id} key={m.id}>
+                          <option value={`${m.id}@${m.version}`} key={`${m.id}@${m.version}`}>
                             {m.name} · {m.version}
                           </option>
                         )
@@ -1567,7 +1742,7 @@ function SettingsPage({
               </button>
             </div>
             {!data.packs.length && (
-              <p className="field-help">先通过 CLI 或 Agent 安装一个学习包，再创建目标。</p>
+              <p className="field-help">先在下方安装一个学习包，再创建目标。</p>
             )}
           </form>
         )}
@@ -1579,12 +1754,11 @@ function SettingsPage({
           </h2>
           <span className="muted">{data.packs.length} 个版本</span>
         </div>
+        <PackInstaller reload={reload} notify={notify} />
         {!data.packs.length ? (
           <div className="pack-empty">
             <h3>好教材，让每一步更有依据。</h3>
-            <p>通过 CLI 安装演示学习包：</p>
-            <code>pnpm ezlearn pack install ./packs/english-demo --json</code>
-            <p>也可以让 Agent 通过 /ezlearn install 安装指定来源与版本。</p>
+            <p>从 GitHub 安装一个明确版本，或上传 English Demo 的 pack.json，开始整理学习方向。</p>
           </div>
         ) : (
           <div className="pack-grid">
@@ -1604,6 +1778,24 @@ function SettingsPage({
                         <code>{m.version}</code>
                         <span>{m.id.includes('demo') ? '功能演示材料' : m.license}</span>
                       </div>
+                      <div className="pack-source">
+                        <span>
+                          {p.source?.kind === 'github'
+                            ? 'GitHub 来源'
+                            : p.source?.kind === 'import'
+                              ? '迁移导入'
+                              : '本地上传'}
+                        </span>
+                        {p.source?.url && (
+                          <p>{p.source.url === 'browser-upload' ? '浏览器上传' : p.source.url}</p>
+                        )}
+                        {p.source?.ref && <p>版本引用：{p.source.ref}</p>}
+                        {p.source?.resolved && (
+                          <p>
+                            实际提交：<code>{p.source.resolved}</code>
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </article>
                 )
@@ -1612,7 +1804,7 @@ function SettingsPage({
           </div>
         )}
         <p className="pack-note">
-          学习包的已安装版本会保留。更新教材，也不会改写过去的题目与成绩。
+          更新学习包时安装新的版本，已安装版本与已有目标的内容版本会保留。过去的题目与成绩不会被改写。
         </p>
       </section>
       <section className="backend-section">
@@ -1644,8 +1836,7 @@ function SettingsPage({
           </button>
         </div>
         <p className="field-help">
-          课程、作答和反馈保存在服务端。切换后端与迁移学习记录，请通过 CLI 的 profile 和 export /
-          import 操作。
+          学习包、课程、作答和反馈由当前平台保存。CLI 可连接不同实例；切换连接不会自动迁移学习记录。
         </p>
       </section>
     </>

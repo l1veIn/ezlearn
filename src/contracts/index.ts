@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const PLATFORM_VERSION = '0.2.0';
+export const API_VERSION = 1;
+
 export const idSchema = z
   .string()
   .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/)

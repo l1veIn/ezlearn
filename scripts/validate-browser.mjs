@@ -13,6 +13,7 @@ const dataDir = resolve(area, `data-${runId}`);
 const screenshots = resolve(area, 'screenshots');
 const baseUrl = 'http://127.0.0.1:3212';
 const cli = resolve(root, 'dist/cli/index.js');
+const platform = resolve(root, 'dist/platform/index.js');
 await mkdir(dataDir, { recursive: true });
 await mkdir(screenshots, { recursive: true });
 const inputPath = resolve(dataDir, 'input.json');
@@ -34,7 +35,7 @@ async function call(operation, input = {}) {
       '--json',
       '--data-dir',
       dataDir,
-      '--base-url',
+      '--endpoint',
       baseUrl,
     ],
     { cwd: root, encoding: 'utf8', windowsHide: true },
@@ -60,7 +61,7 @@ async function stopServer() {
 async function startServer() {
   server = spawn(
     process.execPath,
-    [cli, 'start', '--data-dir', dataDir, '--port', '3212', '--base-url', baseUrl],
+    [platform, '--data-dir', dataDir, '--port', '3212', '--base-url', baseUrl],
     { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   server.stdout.on('data', (chunk) => logs.push(chunk.toString()));
@@ -86,16 +87,9 @@ try {
   let occupied = false;
   try {
     const response = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(500) });
-    occupied = response.ok;
+    occupied = true;
   } catch {}
   assert(!occupied, '3212 端口已在使用。请先停止该端口的服务后重试；脚本不会操作现有实例。');
-  const prepared = spawnSync(
-    process.execPath,
-    [resolve(root, 'examples/prepare-demo.mjs'), dataDir, baseUrl],
-    { cwd: root, encoding: 'utf8', windowsHide: true },
-  );
-  assert.equal(prepared.status, 0, `prepare-demo 失败：${prepared.stderr}`);
-  const demo = JSON.parse(prepared.stdout);
   await startServer();
   const channel =
     process.env.EZLEARN_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined);
@@ -109,6 +103,29 @@ try {
   const page = await context.newPage();
   page.setDefaultTimeout(15000);
   page.on('pageerror', (error) => errors.push(error.message));
+
+  // The independent Web platform installs content without a CLI or teacher token.
+  await page.goto(`${baseUrl}/settings`, { waitUntil: 'networkidle' });
+  await page
+    .getByLabel('选择学习包 JSON', { exact: true })
+    .setInputFiles(resolve(root, 'packs/english-demo/pack.json'));
+  await page.getByRole('button', { name: '校验上传的学习包', exact: true }).click();
+  await page.getByRole('button', { name: '安装上传的学习包', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: '已安装 english-demo@1.0.0。' }),
+  ).toBeVisible();
+  await page.getByRole('heading', { level: 1 }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: resolve(screenshots, 'packs.png'), fullPage: true });
+
+  // CLI is an HTTP client. The platform must be running before seeding.
+  const prepared = spawnSync(
+    process.execPath,
+    [resolve(root, 'examples/prepare-demo.mjs'), dataDir, baseUrl],
+    { cwd: root, encoding: 'utf8', windowsHide: true },
+  );
+  assert.equal(prepared.status, 0, `prepare-demo 失败：${prepared.stderr}`);
+  const demo = JSON.parse(prepared.stdout);
 
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await expect(page.getByRole('heading', { name: /每天一点，\s*慢慢学会。/ })).toBeVisible();
@@ -226,6 +243,8 @@ try {
     next_lesson_id: next.id,
     checks: [
       'home',
+      'independent_platform_start',
+      'web_pack_upload_validation_install',
       'lesson',
       'save_draft',
       'reload_restore',
@@ -241,6 +260,7 @@ try {
     ],
     screenshots: {
       home: resolve(screenshots, 'home.png'),
+      packs: resolve(screenshots, 'packs.png'),
       result: resolve(screenshots, 'result.png'),
       continuation: resolve(screenshots, 'continuation.png'),
     },

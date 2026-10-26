@@ -1,6 +1,8 @@
 # 学习包格式 v1
 
-学习包是纯数据。可安装目录根的 `pack.json`；材料正文包含在 JSON 内，不执行脚本、不运行安装钩子。目录里的 README 与讲义副本便于人读，运行时以校验后的 JSON 快照为准。
+学习包是可分发、可版本化的学习依据，包含范围、知识结构、参考内容和评价标准。GitHub 仓库是初期的主要分发渠道，不建设学习包市场。作者维护来源仓库，平台负责下载、校验、安装、检索、版本保存和与目标的关联；Web 与 CLI 都可提供管理入口。
+
+当前格式 v1 是纯数据：仓库或目录根包含 `pack.json`，材料正文内联，不执行脚本或安装钩子。目录中的 README 与讲义副本便于人读，平台以校验后的 JSON 快照为准。包不包含用户作答、掌握情况或部署凭证；Agent 为某个用户生成的教学内容属于课程快照，通常不直接修改原包。
 
 完整例子是 [`packs/english-demo/pack.json`](../packs/english-demo/pack.json)。它包含 4 个稳定 topic、16 道原创题、1 份讲义和 4 个蓝图；不是官方英语考试材料。
 
@@ -71,9 +73,11 @@ Agent 补充练习使用相同 schema，source_type 写 `agent`。补充题也�
 
 `kind` 区分 `diagnostic/daily/checkpoint/mock`。每节声明题型、题数、每题分值和必须覆盖的 topic；题库必须有足够的不重复题完成覆盖。包校验与组卷都会检查约束。不同结果保留原 kind，未做摸底不会转换成低能力。
 
-组卷按 section 顺序执行，每节先尝试确定性覆盖，再在必要时搜索组合；搜索最多 20,000 个状态，过于复杂时明确返回 `BLUEPRINT_TOO_COMPLEX`。同题型、同分值且题目池重叠的 section 建议合并，避免前一节取题影响后一节；v0.1 不提供跨 section 的全局最优组合搜索。发布前必须通过实际组卷校验。
+组卷按 section 顺序执行，每节先尝试确定性覆盖，再在必要时搜索组合；搜索最多 20,000 个状态，过于复杂时明确返回 `BLUEPRINT_TOO_COMPLEX`。同题型、同分值且题目池重叠的 section 建议合并，避免前一节取题影响后一节；当前不提供跨 section 的全局最优组合搜索。发布前必须通过实际组卷校验。
 
 ## 安装、固定版本与更新
+
+保持平台运行。在 Web 的“我的书架”可上传 pack.json，或提交公开 GitHub 仓库与明确 ref。GitHub 获取在平台执行；上传后由目标实例完整保存，云端包不依赖 CLI 所在电脑的路径。
 
 ```powershell
 pnpm ezlearn pack validate ./packs/english-demo --json
@@ -82,8 +86,10 @@ pnpm ezlearn pack list --json
 pnpm ezlearn pack show english-demo --json
 ```
 
-公开 GitHub 仓库安装必须指定 ref；仓库根目录包含 `pack.json`。例如 `pnpm ezlearn pack install https://github.com/OWNER/REPO --ref v1.0.0 --json`（将占位值换成真实包地址）。ref 可为 tag、branch 或 commit；安装会记录解析的实际 commit。演示占位地址不是可下载资源，不能把它当作真实包访问。
+公开 GitHub 仓库安装必须指定 ref；仓库根目录包含 `pack.json`。例如 `pnpm ezlearn pack install https://github.com/OWNER/REPO --ref v1.0.0 --json`（将占位值换成真实包地址）。CLI 只将仓库与 ref 交给平台。ref 可为 tag、branch 或 commit，平台记录解析的实际 commit。演示占位地址不是可下载资源，不能当作真实包访问。当前不支持任意仓库子目录地址或私有 GitHub 内容源。
 
 同一个 ID/version 的内容一旦安装即不可更换；修改内容应提高版本号并再次安装。旧版本保留，目标固定版本，已发布课程与答题绑定完整快照。后续包修改不会改变旧答案或成绩。不同版本中沿用同一个 topic ID 必须保持语义稳定；主题含义变了应创建新 ID。
 
-安装器限制文件与包大小，拒绝路径穿越与链接逃逸。v0.1 无压缩包解压流程，因此不会执行压缩包路径或脚本。完整实例也受 [1,500,000 字节容量上限](architecture.md) 约束。
+平台限制文件与包大小并校验材料相对路径；CLI 本地目录上传还拒绝链接逃逸。当前不解压学习包压缩文件，不执行包脚本。完整实例受 [1,500,000 字节容量上限](architecture.md) 约束。
+
+应用版本、学习包内容版本与导出格式版本分别管理。当前更新包需指定来源版本并安装，尚无自动追踪 GitHub 更新或自动切换目标版本的功能。未来可按兼容策略检查/下载新版本，历史课程与成绩仍绑定原快照。更轻的讲义包、无题库包属于后续格式设计，当前 v1 schema 仍要求非空材料、题库和蓝图。

@@ -1,4 +1,10 @@
-import { AppError, packSchema, type Pack, type PackSource } from '../contracts/index.js';
+import {
+  AppError,
+  PLATFORM_VERSION,
+  packSchema,
+  type Pack,
+  type PackSource,
+} from '../contracts/index.js';
 
 const MAX_FILE_BYTES = 400_000;
 export async function boundedJson(response: Response, max = MAX_FILE_BYTES): Promise<unknown> {
@@ -49,7 +55,10 @@ export async function loadGithubPack(
     );
   const owner = match[1],
     name = match[2];
-  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'ezlearn/0.1.0' };
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': `ezlearn/${PLATFORM_VERSION}`,
+  };
   const commit = (await boundedJson(
     await fetch(
       `https://api.github.com/repos/${owner}/${name}/commits/${encodeURIComponent(ref)}`,

@@ -1,82 +1,85 @@
-# Agent、Skill 与每日学习
+# CLI、Skill 与 Agent 接入
 
-ezlearn 不内置模型。宿主 Agent 负责选取合法可见的上下文、讲解与主观题反馈，平台负责快照、答案、客观评分和进度。CLI/MCP 接入已与同一个核心契约连接，具体运行验收见 README。
+平台负责课程、作答、评分校验和学习证据；Agent 负责教学编排。Skill 是 CLI 使用说明和简短工作流，不承担业务规则。所有学习命令通过同一个 HTTP API，包括本机平台。
 
-## 本仓库的 Codex 接入
+## 先启动并连接平台
 
-仓库已包含 `.agents/skills/ezlearn/SKILL.md`，它把工作流指向 `integrations/skills/ezlearn/SKILL.md`。在此仓库启动一个新的 Codex 会话，让宿主加载技能列表；没有出现时重启会话并检查本地技能是否被禁用。官方说明列出 `.agents/skills` 的仓库发现路径，并说明 CLI/IDE 可用 `$` 显式选择技能；这与自定义斜杠命令是两种能力。[OpenAI 官方技能文档](https://learn.chatgpt.com/docs/build-skills)
+按 README 独立启动平台，或运行 `pnpm ezlearn start`。在操作终端确认：
 
-运行本地服务后，可以在 Agent 里说：
+~~~powershell
+pnpm ezlearn --help
+pnpm ezlearn profile show --json
+pnpm ezlearn status --json
+pnpm ezlearn platform doctor --json
+~~~
 
-```text
+平台未启动时先处理连接问题，不回退到 SQLite。首次运行可用 `node examples/prepare-demo.mjs` 安装原创演示包并发布一课；脚本也通过正式 CLI/HTTP 操作。
+
+CLI 从源码用 `pnpm ezlearn <命令>`，构建后可用 `node C:/path/to/ezlearn/dist/cli/index.js <命令>`。尚未发布 npm 包。输入写 JSON 文件并用 --input，stdout 的 --json 输出为成功或机器错误封套，日志在 stderr。
+
+## 实例与凭证配置
+
+profile 保存 endpoint 及凭证引用；名称只方便切换，不定义另一套学习执行方式。--config-dir 是 CLI 配置目录，默认使用 --data-dir。本机默认实例目录中的 connection.json 由平台生成，CLI 只向完全匹配的 endpoint 使用凭证。
+
+端点优先级为：显式 --endpoint（或兼容的 --base-url）→ 显式 --profile → 环境变量 → 当前默认 profile。显式选择 profile 时不会被全局端点环境变量改写。
+
+配置云端时，将以下内容写入 .ezlearn/cloud-profile.json：
+
+~~~json
+{"endpoint":"https://你的平台域名","token_env":"EZLEARN_API_TOKEN"}
+~~~
+
+~~~powershell
+pnpm ezlearn profile set --name cloud --input .ezlearn/cloud-profile.json --json
+pnpm ezlearn profile list --json
+pnpm ezlearn status --profile cloud --json
+pnpm ezlearn profile use cloud --json
+~~~
+
+token_env 保存进程环境变量名，不保存密钥。不要把真实 token 写进命令参数、配置仓库或聊天。--endpoint URL 覆盖成另一端点时会清除原 profile 的凭证引用；可显式使用 --token-env ENV 或 --connection-file FILE，或让 CLI 从指定 --data-dir 中发现端点匹配的 connection.json。仅设置同名全局环境变量不会自动把它发送给其他实例。兼容握手不携带凭证。
+
+多个本地实例可以用 connection_file 引用各自生成的连接文件。例如 profile JSON 中填入 `{"endpoint":"http://127.0.0.1:3211","connection_file":"C:/path/to/instance-b/connection.json"}`，再按上述 set/use 流程保存命名 profile。CLI 将路径绝对化并校验文件 endpoint，避免把 A 的本地凭证发给 B。跨项目使用时固定配置目录或明确指定 profile。
+
+旧 kind:local / kind:remote 配置由 CLI 兼容读取并转换为端点配置；转换后检查 profile show 和 status，学习数据不会随配置转换或端点切换自动迁移。
+
+## Codex 仓库技能入口
+
+仓库的 .agents/skills/ezlearn/SKILL.md 指向完整工作流 integrations/skills/ezlearn/SKILL.md。OpenAI 官方文档说明 Codex 会发现仓库 .agents/skills，并可在 CLI/IDE 中用 /skills 或 $ 选择技能；修改未出现时可重启宿主。[OpenAI 官方技能文档](https://learn.chatgpt.com/docs/build-skills)
+
+加载技能后：
+
+~~~text
 $ezlearn
-/ezlearn 我要学英语，每天15分钟。先用English Demo体验。
-```
+/ezlearn 我要学英语，每天15分钟，先用English Demo体验。
+~~~
 
-`/ezlearn` 是项目约定的学习意图入口。Codex 中用 `$ezlearn` 选择已加载技能；其他宿主若未注册同名 slash，把完整 `/ezlearn ...` 当普通消息，要求其使用此技能即可。不要假定放置 SKILL.md 就自动注册所有宿主的 `/ezlearn`。
+/ezlearn 是学习意图入口，各宿主的自定义 slash 注册方式不同。没有选择器时可直接要求：“读取 integrations/skills/ezlearn/SKILL.md，按其中流程处理 /ezlearn …”。不要宣称一个文件自动兼容所有宿主。
 
-如果技能尚未加载，当前会话的可用接法：
+安装到其他项目时复制完整 integrations/skills/ezlearn 目录，不能只复制本仓库的相对引用入口。先确认目标不存在，已有同名技能需合并：
 
-```text
-请读取 integrations/skills/ezlearn/SKILL.md，并按该工作流执行：
-/ezlearn 我要学英语，每天15分钟。先用English Demo体验。
-```
-
-项目开发环境已检查 Codex CLI 的 `--help` 和 `mcp add --help`。本轮业务验收通过正式 CLI/MCP 客户端完成；没有据此宣称所有 Codex 版本的 slash 选择器、其他会话历史或宿主自动定时已经完成端到端验证。
-
-## 安装到其他工作目录
-
-从项目根把完整技能复制到目标仓库的 `.agents/skills/ezlearn`。先确认目标不存在，已有同名技能请人工合并，勿覆盖。不要只复制仓库入口文件，它的相对引用依赖本仓库结构。
-
-```powershell
-$skillTarget = Join-Path 'C:\path\to\your-project' '.agents\skills\ezlearn'
-if (Test-Path -LiteralPath $skillTarget) { throw '目标已有 ezlearn 技能，请先检查内容' }
+~~~powershell
+$skillTarget = Join-Path 'C:/path/to/your-project' '.agents/skills/ezlearn'
+if (Test-Path -LiteralPath $skillTarget) { throw '已有同名技能，请先检查内容' }
 New-Item -ItemType Directory -Path (Split-Path -Parent $skillTarget) -Force | Out-Null
 Copy-Item -LiteralPath './integrations/skills/ezlearn' -Destination $skillTarget -Recurse
-```
+~~~
 
-在 ezlearn 仓库中 `pnpm build` 后，可使用绝对路径 `node C:\path\to\ezlearn\dist\cli\index.js`。跨仓库学习要设置相同的绝对 data-dir 或 profile，避免每个当前目录各建一个实例。也可以在本地从源码链接 bin，但 npm 上没有发布可安装的 ezlearn 包。
+Claude Code、Hermes、DSH 等宿主通过其授权的 shell 使用同一 CLI，按自己的技能规则加载工作流。这里不提供未经验证的 slash、历史读取或定时注册命令。MCP 已退出默认产品路径。
 
-## CLI、profile 与远程 MCP
+## 教学与阅卷
 
-CLI `--json` 返回机器可读封套，输入内容写 JSON 文件。通用入口让任何宿主使用同一数据契约：
+1. 查询当前实例、学习包、目标、待阅卷、进度和 plan next。只补充真正缺失的信息；默认每天 15 分钟、水平 unknown，摸底可跳过。
+2. 优先恢复未完成课程，处理待阅卷和到期复习，再引入新内容。多目标不明确时才请用户选择。
+3. 从宿主实际可见范围形成精简 context_summary。不能读取其他会话就使用当前对话或通用例子，不扫描硬盘或提交原始工作对话。
+4. 根据目标、依赖和证据选一个小 topic，检索材料，形成目标、短讲解、熟悉例子和少量练习。调用 lesson create / publish，给出平台返回的学习 URL。
+5. 用户在 Web 保存并提交，把准确 attempt_id 的交接提示词带回 Agent。
+6. 用 attempt show 读取教师视图，对每题反馈。客观分由平台计算，简答按 rubric 给分。review submit 首次 expected_version=0，写回 summary 和 next_steps。
+7. 用户刷新结果；Agent 读下一计划，继续或在可恢复状态结束。
 
-```powershell
-pnpm ezlearn status --json
-pnpm ezlearn profile show --json
-pnpm ezlearn call list_goals --json
-pnpm ezlearn call create_lesson --input ./examples/inputs/lesson.json --json
-```
+用户只说“做完了”时先查询 pending。只有一份直接处理；多份结合当前目标、最近课程或准确 ID 识别，仍有歧义再让用户选择，不能随意取第一条。
 
-profile 保存于 data-dir 的 `profile.json`。本地 profile 使用 `{"kind":"local"}`；通过 `--data-dir` 或 `EZLEARN_DATA_DIR` 固定数据目录，通过 `--base-url` 或 `EZLEARN_BASE_URL` 设置课程链接。远程使用 `kind: remote`、实例 `url` 和保存 token 的环境变量名 `token_env`。profile 不保存 token 本身，也不会改变原实例数据。确切字段参见 CLI `profile show` 结果和[迁移步骤](migration.md)。
-
-远程 MCP 的地址是 `https://你的域名/mcp`，传输为 Streamable HTTP。部署后可显式配置 Codex：
-
-```powershell
-codex mcp add ezlearn --url https://你的域名/mcp --bearer-token-env-var EZLEARN_API_TOKEN
-```
-
-先通过系统安全方式为进程设置 `EZLEARN_API_TOKEN`，不要把 token 粘进命令参数、配置仓库或课程 URL。本地开发服务器也提供回环 MCP，可在可信本机环境调用。远程 Web 登录使用相同部署的登录凭证换取会话，不把 Bearer 放入浏览器 localStorage。
-
-Claude Code、Hermes、DSH 等宿主提供通用适配：配置有权限的 shell 调用本地 CLI，或在支持 Streamable HTTP 的 MCP 设置中填 URL 与 Bearer，再把 Skill 工作流按宿主自己的规则注册。此处没有验证它们的技能目录、slash 语法、跨会话权限或定时工具，不提供虚构的一键安装命令。
-
-## 一轮真实交接
-
-1. Agent 查 status、pack/goal、pending/progress，再调用 plan next。
-2. 首次创建目标，关联准确包版本；水平未知就保持 unknown，可跳过摸底。
-3. 查询材料，把一小段实际可见的项目背景写入 context_summary。不能读取其他会话时明确使用当前会话或通用例子。
-4. 调用 create_lesson，再 publish_lesson；把返回 URL 给用户。
-5. 用户 Web 阅读、保存草稿、提交，得到“已提交，待老师反馈”。
-6. 用户复制页面提示词回 Agent；提示词含 backend 与准确 attempt_id，不含密钥。
-7. Agent 用 get_attempt 教师视图读取快照，按 rubric 提交逐题评分、feedback、summary、next_steps。
-8. 平台计算客观分并保存评价、进度；用户刷新结果页，Agent 用 plan next 安排续学。
-
-用户只说“做完了”时，查询待阅卷。只有一份就处理；多份先结合当前目标/最近课程识别，仍不清楚再请其选择。不可随意取第一条。
-
-首次评价 `expected_version=0`，稳定 key `review:<attempt_id>:1`；修改评价要读取当前 version，提供新 key 和 revision_reason。客观分不能被教师覆盖。参考输入文件的分数只是格式示例，必须按实际答案替换。
+课程使用稳定 key `daily:<goal_id>:<用户本地YYYY-MM-DD>`；同日重试复用输入。首次评价 key `review:<attempt_id>:1`；修订用当前 version、新 key 和 revision_reason。平台校验版本冲突，不盲目覆盖或通过换 key 制造重复。
 
 ## 定时学习
 
-模板在 `integrations/skills/ezlearn/references/daily-prompt.md`。仅当用户明确启用时，把它放进宿主支持的定时任务。每日课程使用 `daily:<goal_id>:<用户本地YYYY-MM-DD>` 幂等键；同日重试返回原课，内容冲突要先查询。
-
-平台不保存 LLM Key，不主动唤醒 Agent，不声称已推送。提醒应只在有新课程、结果、错误或需要用户行动时通知；没有变化时保持安静。宿主不支持定时，就由用户手动 `/ezlearn`。
+模板在 integrations/skills/ezlearn/references/daily-prompt.md。只有用户明确启用后才交给宿主支持的任务系统。没有变化时保持安静，有新课程、结果、失败或需要用户操作时再通知。平台不保证自动唤醒 Agent，不内置跨平台通知；没有宿主定时能力就手动发起学习。

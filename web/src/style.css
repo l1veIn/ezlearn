@@ -2555,3 +2555,119 @@ button {
 .result-actions .button {
   font-size: 11px;
 }
+
+.pack-installer {
+  border: 1px solid var(--line);
+  padding: 27px 29px;
+  background: #f0f1e7;
+  margin-bottom: 27px;
+}
+.pack-install-heading h3 {
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.7;
+}
+.pack-install-heading > p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.9;
+  margin-top: 7px;
+}
+.pack-install-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 25px;
+}
+.pack-install-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 0;
+}
+.pack-install-form + .pack-install-form {
+  border-left: 1px solid var(--line);
+  padding-left: 30px;
+}
+.pack-install-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #6f7866;
+  font-size: 12px;
+}
+.pack-install-form input {
+  width: 100%;
+  font-size: 12px;
+  min-width: 0;
+}
+.pack-install-form input[type='file'] {
+  font-size: 11px;
+  padding: 12px 10px;
+  background: #f7f6ef;
+}
+.pack-install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: auto;
+}
+.pack-install-actions .button {
+  font-size: 11px;
+  padding: 11px 13px;
+  gap: 8px;
+}
+.pack-installer > .notice {
+  margin-top: 20px;
+}
+.pack-source {
+  margin-top: 17px;
+  padding-top: 13px;
+  border-top: 1px solid #e0e3d4;
+  color: #87917a;
+  font-size: 10px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.pack-source > span {
+  font-size: 9px;
+  letter-spacing: 0.7px;
+}
+.pack-source p {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.pack-source code {
+  font-size: 9px;
+}
+@media (max-width: 1050px) {
+  .pack-install-grid {
+    grid-template-columns: 1fr;
+    gap: 23px;
+  }
+  .pack-install-form + .pack-install-form {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 23px;
+  }
+}
+@media (max-width: 650px) {
+  .pack-installer {
+    padding: 20px 17px;
+  }
+  .pack-install-heading h3 {
+    font-size: 14px;
+  }
+  .pack-install-heading > p,
+  .pack-install-form > .field-help {
+    font-size: 10px;
+  }
+  .pack-install-actions .button {
+    font-size: 10px;
+  }
+  .pack-install-grid {
+    margin-top: 20px;
+  }
+}

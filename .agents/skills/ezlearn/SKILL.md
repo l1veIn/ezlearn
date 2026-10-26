@@ -1,12 +1,12 @@
 ---
 name: ezlearn
-description: 使用已有 Agent 进行每日短时学习。用户说 /ezlearn、开始/继续 ezlearn、安装学习包，或回传 ezlearn attempt_id 请求阅卷时使用。复用本地 CLI 或远程 MCP 保存课程、答案和学习证据。
+description: 使用 ezlearn 平台开始或继续每日学习、安装学习包，或按 attempt_id 阅卷；不用于 ezlearn 项目开发或架构讨论。
 ---
 
 # ezlearn 仓库入口
 
-先读取仓库内 `integrations/skills/ezlearn/SKILL.md`，按其中的初始化、恢复、备课、发布、阅卷与失败恢复步骤执行。该文件相对本目录为 `../../../integrations/skills/ezlearn/SKILL.md`。
+读取仓库 integrations/skills/ezlearn/SKILL.md（相对本目录 ../../../integrations/skills/ezlearn/SKILL.md），按其简短流程使用 CLI。
 
-从仓库根执行 `pnpm ezlearn status --json` 与 `pnpm ezlearn profile show --json` 确认实例。按 profile 选择本地 CLI 或远程 MCP。所有教学状态与评分通过平台操作；不要直接改数据库，不在聊天输出凭证。平台无需 LLM API Key。
+先确认 profile 与 status。学习操作统一通过选定实例的 HTTP API，平台未启动时提示启动；不直接改数据库，不输出凭证，不把端点切换当数据迁移。Skill 负责教学顺序，平台校验评分、版本和证据。
 
-用户输入 `/ezlearn` 表示调用此工作流；宿主若没有自定义斜杠命令，就用 `$ezlearn` 显式选择技能或要求读取上述文件，不声称 slash 已被注册。每轮约 15 分钟，一个小知识点，先处理未完成课程、待阅卷与到期复习。用户提交后必须使用准确 attempt_id，不猜记录。
+用户的 /ezlearn 是学习意图。宿主未注册同名 slash 时，可用 $ezlearn 显式选择或要求读取上述文件，不声称已自动注册所有宿主命令。
